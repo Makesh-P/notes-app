@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notes Home</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: "Segoe UI", sans-serif; }
+body { background: #f5f5f5; height: 100vh; overflow: hidden; }
+
+.header { height: 60px; background: #ffffff; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
+.app-name { font-size: 20px; font-weight: 600; flex: 1; }
+.search-box { flex: 2; display: flex; justify-content: center; }
+.search-box input { width: 70%; padding: 8px 14px; border-radius: 20px; border: 1px solid #ccc; outline: none; font-size: 14px; }
+
+.main { padding: 20px; height: calc(100vh - 60px); overflow-y: auto; }
+.grid { column-count: 4; column-gap: 15px; }
+@media(max-width: 1200px) { .grid { column-count: 3; } }
+@media(max-width: 900px) { .grid { column-count: 2; } }
+@media(max-width: 600px) { .grid { column-count: 1; } }
+
+.card {
+  background: #fff;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  break-inside: avoid;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+}
+.card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); }
+.card.todo { background: #e8f1ff; }
+.card.budget { background: #fff4e6; }
+
+.card-title { font-weight: 600; margin-bottom: 6px; }
+.card-preview { font-size: 13px; color: #555; }
+
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+.badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: #ff4444;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+  z-index: 10;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 68, 68, 0.9);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.card:hover .delete-btn { opacity: 1; transform: scale(1); }
+.delete-btn:hover { background: #ff4444; transform: scale(1.1); }
+
+.magic-menu { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; z-index: 9999; }
+.magic-main {
+  width: 60px; height: 60px; border-radius: 50%; background: #000; color: #fff; font-size: 32px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); transition: transform 0.3s ease; position: relative; z-index: 10;
+}
+.magic-menu.active .magic-main { transform: rotate(45deg); }
+.magic-items { position: absolute; bottom: 6px; left: 6px; width: 48px; height: 48px; pointer-events: none; }
+.magic-item {
+  position: absolute; width: 48px; height: 48px; border-radius: 50%; background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center;
+  font-size: 20px; opacity: 0; transform: scale(0.5) translateY(10px);
+  transition: transform 0.45s cubic-bezier(0.22, 1.6, 0.36, 1), opacity 0.3s ease;
+  pointer-events: none; text-decoration: none; color: #000; z-index: 5;
+}
+.magic-menu.active .magic-item { pointer-events: auto; }
+.magic-menu.active .note { transform: translate(-45px, -40px) scale(1); opacity: 1; transition-delay: 0.05s; }
+.magic-menu.active .todo { transform: translate(0, -65px) scale(1); opacity: 1; transition-delay: 0.12s; }
+.magic-menu.active .budget { transform: translate(45px, -40px) scale(1); opacity: 1; transition-delay: 0.18s; }
+</style>
+</head>
+
+<body>
+<div class="header">
+  <div class="app-name">My Notes</div>
+  <div class="search-box">
+    <input type="text" placeholder="Search notes...">
+  </div>
+</div>
+
+<div class="main">
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="magic-menu" id="magicMenu">
+  <div class="magic-items">
+    <a href="note.html" class="magic-item note">✏️</a>
+    <a href="to-do.html" class="magic-item todo">☑️</a>
+    <a href="budget.html" class="magic-item budget">💰</a>
+  </div>
+  <div class="magic-main" id="magicToggle">+</div>
+</div>
+
+<script>
+const API = "https://notes-app-a631.onrender.com";
+const REMINDER_LOCK_KEY = "reminderLock";
+
+// ✅ SHARED REMINDER STORAGE - Works across all tabs
+let allReminders = JSON.parse(localStorage.getItem('allNoteReminders') || '[]');
+
+function checkAllReminders() {
+  const now = Date.now();
+  let reminders = JSON.parse(localStorage.getItem("allNoteReminders") || "[]");
+
+  const lock = localStorage.getItem(REMINDER_LOCK_KEY);
+  if (lock && Date.now() - lock < 5000) return;
+
+  let changed = false;
+
+  reminders.forEach(r => {
+    if (!r.triggered && now >= new Date(r.time).getTime()) {
+      localStorage.setItem(REMINDER_LOCK_KEY, Date.now());
+      r.triggered = true;
+      showGlobalNotification(r);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    localStorage.setItem("allNoteReminders", JSON.stringify(reminders));
+    loadHome();
+  }
+}
+
+
+// ✅ FIXED loadHome()
+function loadHome() {
+  fetch(`${API}/home`)
+    .then(res => res.json())
+    .then(items => {
+      const grid = document.getElementById("grid");
+      grid.innerHTML = "";
+      items.forEach(item => {
+        const card = document.createElement("a");
+        card.className = `card ${item.type}`;
+        card.href = item.type === 'todo' ? `to-do.html?id=${item.id}` : `${item.type}.html?id=${item.id}`;
+        
+        const activeCount = allReminders.filter(r => r.noteId == item.id && !r.triggered).length;
+        const badgeHtml = activeCount > 0 ? `<div class="badge">${activeCount}</div>` : '';
+        
+        card.innerHTML = `
+          <button class="delete-btn" onclick="deleteItem(${item.id}, '${item.type}', event)">×</button>
+          ${badgeHtml}
+          <div class="card-title">${item.title}</div>
+          <div class="card-preview">${item.preview}</div>
+        `;
+        grid.appendChild(card);
+      });
+    })
+    .catch(err => console.error("Load error:", err));
+}
+
+function deleteItem(id, type, event) {
+  event.preventDefault();
+  event.stopPropagation();
+  if (confirm(`Delete "${type}" item?`)) {
+    fetch(`${API}/${type}/${id}`, { method: "DELETE" })
+      .then(() => {
+        allReminders = allReminders.filter(r => r.noteId != id);
+        localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
+        loadHome();
+      });
+  }
+}
+
+// ✅ GLOBAL FUNCTIONS (Self-contained)
+window.addNoteReminder = function(noteId, label, time) {
+  const reminder = {
+    id: Date.now(),
+    noteId: parseInt(noteId),
+    label,
+    time,
+    triggered: false
+  };
+  allReminders.push(reminder);
+  localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
+  loadHome();
+  return reminder.id;
+};
+
+window.deleteNoteReminder = function(reminderId) {
+  allReminders = allReminders.filter(r => r.id != reminderId);
+  localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
+  loadHome();
+};
+
+window.getNoteReminders = function(noteId) {
+  return allReminders.filter(r => r.noteId == noteId);
+};
+
+// Notification permission
+if ("Notification" in window && Notification.permission === "default") {
+  Notification.requestPermission();
+}
+
+// Start reminder engine
+setInterval(checkAllReminders, 30000);
+checkAllReminders();
+loadHome();
+
+const magicMenu = document.getElementById("magicMenu");
+const magicToggle = document.getElementById("magicToggle");
+magicToggle.onclick = e => { e.stopPropagation(); magicMenu.classList.toggle("active"); };
+document.onclick = e => { if (!magicMenu.contains(e.target)) magicMenu.classList.remove("active"); };
+window.onpageshow = () => magicMenu.classList.remove("active");
+</script>
+</body>
+</html>
