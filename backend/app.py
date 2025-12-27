@@ -142,7 +142,7 @@ def save_todo():
     if not preview.strip():
         preview = "No tasks"
     
-    if d.get("id") and int(d.get("id")) > 0:if d.get("id"):
+    if d.get("id") and int(d.get("id")) > 0:
         c.execute("UPDATE todos SET title=?, tasks=?, updated_at=? WHERE id=?", (d["title"], d["tasks"], now, d["id"]))
         c.execute("UPDATE items SET title=?, preview=?, updated_at=? WHERE type='todo' AND ref_id=?", (d["title"], preview, now, d["id"]))
         db.commit()
