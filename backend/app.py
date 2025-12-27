@@ -99,7 +99,7 @@ def save_note():
         c.execute("DELETE FROM notes WHERE title=? AND content=?", (d["title"], d["content"][:100]))
         c.execute("DELETE FROM items WHERE type='note' AND title=? AND preview=?", (d["title"], d["content"][:60]))
 
-    if d.get("id"):
+    if d.get("id") and int(d.get("id")) > 0:
         # ✅ UPDATED: Save reminder_count
         c.execute("""UPDATE notes SET title=?, keywords=?, content=?, updated_at=? WHERE id=?""", 
                  (d["title"], d["keywords"], d["content"], now, d["id"]))
@@ -142,7 +142,7 @@ def save_todo():
     if not preview.strip():
         preview = "No tasks"
     
-    if d.get("id"):
+    if d.get("id") and int(d.get("id")) > 0:if d.get("id"):
         c.execute("UPDATE todos SET title=?, tasks=?, updated_at=? WHERE id=?", (d["title"], d["tasks"], now, d["id"]))
         c.execute("UPDATE items SET title=?, preview=?, updated_at=? WHERE type='todo' AND ref_id=?", (d["title"], preview, now, d["id"]))
         db.commit()
@@ -193,7 +193,7 @@ def save_budget():
     except:
         preview = "Budget items"
     
-    if d.get("id"):
+    if d.get("id") and int(d.get("id")) > 0:
         c.execute("UPDATE budgets SET title=?, data=?, updated_at=? WHERE id=?", (d["title"], d["data"], now, d["id"]))
         c.execute("UPDATE items SET title=?, preview=?, updated_at=? WHERE type='budget' AND ref_id=?", 
                  (d["title"], preview, now, d["id"]))
