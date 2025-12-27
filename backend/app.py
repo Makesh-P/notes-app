@@ -14,6 +14,9 @@ def get_db():
     return sqlite3.connect(DB, check_same_thread=False)
 
 def init_db():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
     db = get_db()
     c = db.cursor()
     # ✅ UPDATED: Added reminder_count column
@@ -39,26 +42,20 @@ init_db()
 @app.route("/")
 @app.route("/index.html")
 def serve_index():
-    return send_from_directory("../frontend", "index.html")
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 @app.route("/note.html")
 def serve_note():
-    return send_from_directory("../frontend", "note.html")
+    return send_from_directory(FRONTEND_DIR, "note.html")
 
 @app.route("/to-do.html")
 def serve_todo():
-    return send_from_directory("../frontend", "to-do.html")
+    return send_from_directory(FRONTEND_DIR, "to-do.html")
 
 @app.route("/budget.html")
 def serve_budget():
-    return send_from_directory("../frontend", "budget.html")
+    return send_from_directory(FRONTEND_DIR, "budget.html")
 
-# Catch-all for any .html file with query params (like ?id=7)
-@app.route("/<path:filename>")
-def serve_static(filename):
-    if filename.endswith('.html'):
-        return send_from_directory("../frontend", filename)
-    return "File not found", 404
 
 # ========== API ROUTES ==========
 @app.route("/home")
