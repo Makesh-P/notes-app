@@ -89,7 +89,7 @@ def get_note(id):
 
 @app.route("/note", methods=["POST"])
 def save_note():
-    d = request.json
+    d = request.get_json(force=True)
     now = datetime.now().isoformat()
     db = get_db()
     c = db.cursor()
@@ -131,7 +131,7 @@ def delete_note(id):
 # ---------- TODOS ----------
 @app.route("/todo", methods=["POST"])
 def save_todo():
-    d = request.json
+    d = request.get_json(force=True)
     now = datetime.now().isoformat()
     db = get_db()
     c = db.cursor()
@@ -178,7 +178,7 @@ def delete_todo(id):
 # ---------- BUDGETS (FIXED) ----------
 @app.route("/budget", methods=["POST"])
 def save_budget():
-    d = request.json
+    d = request.get_json(force=True)
     now = datetime.now().isoformat()
     db = get_db()
     c = db.cursor()
