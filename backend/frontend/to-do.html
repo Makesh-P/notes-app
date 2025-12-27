@@ -336,7 +336,7 @@ body{
     };
 
     /* 2. SAVE FUNCTION (EXACTLY like note.html) */
-    function saveData(silent = false) {
+    function saveData(silent = false, goHome = false) {
       if (isSaving) return;
       
       const title = todoTitle.value.trim();
@@ -357,14 +357,19 @@ body{
       })
       .then(res => res.json())
       .then(data => {
-        if (data.ok) {
-          if (data.id && !todoId) {
-            todoId = data.id;
-            history.replaceState(null, "", `to-do.html?id=${todoId}`);
-          }
-          if(!silent) alert("Todo Saved ✔");
-        }
-      })
+  if (data.ok) {
+    if (data.id && !todoId) {
+      todoId = data.id;
+      history.replaceState(null, "", `to-do.html?id=${todoId}`);
+    }
+    if (!silent) alert("Todo Saved ✔");
+
+    if (goHome) {
+      window.location.href = "index.html";
+    }
+  }
+})
+
       .catch(err => console.error("Save error:", err))
       .finally(() => {
         isSaving = false;
@@ -373,15 +378,12 @@ body{
 
     /* 3. CTRL+S (Save → IMMEDIATE Home Redirect) */
     document.addEventListener("keydown", e => {
-      if (e.ctrlKey && e.key === "s") {
-        e.preventDefault();
-        saveData(false);
-        
-        setTimeout(() => {
-          window.location.href = "index.html";
-        }, 1200);
-      }
-    });
+  if (e.ctrlKey && e.key === "s") {
+    e.preventDefault();
+    saveData(false, true);
+  }
+});
+
 
     /* NOTIFICATION PERMISSION */
     if("Notification" in window && Notification.permission!=="granted"){
