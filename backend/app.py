@@ -136,25 +136,41 @@ def save_todo():
     db = get_db()
     c = db.cursor()
     
-    # FIXED PREVIEW: Clean HTML for preview
-    raw_tasks = d["tasks"] or ""
+    raw_tasks = d.get("tasks", "")
     preview = raw_tasks.replace('<li>', '').replace('</li>', '').replace('<span>', '').replace('<div>', '')[:60]
     if not preview.strip():
         preview = "No tasks"
     
     if d.get("id") and int(d.get("id")) > 0:
-        c.execute("UPDATE todos SET title=?, tasks=?, updated_at=? WHERE id=?", (d["title"], d["tasks"], now, d["id"]))
-        c.execute("UPDATE items SET title=?, preview=?, updated_at=? WHERE type='todo' AND ref_id=?", (d["title"], preview, now, d["id"]))
+        # UPDATE existing todo
+        c.execute(
+            "UPDATE todos SET title=?, tasks=?, updated_at=? WHERE id=?",
+            (d["title"], d["tasks"], now, d["id"])
+        )
+        c.execute(
+            "UPDATE items SET title=?, preview=?, updated_at=? WHERE type='todo' AND ref_id=?",
+            (d["title"], preview, now, d["id"])
+        )
         db.commit()
         db.close()
         return jsonify({"ok": True, "id": d["id"]})
     else:
-        c.execute("INSERT INTO todos VALUES (NULL,?,?,?)", (d["title"], d["tasks"], now))
+        # CREATE new todo
+        c.execute(
+            "INSERT INTO todos VALUES (NULL,?,?,?)",
+            (d["title"], d["tasks"], now)
+        )
         tid = c.lastrowid
-        c.execute("INSERT INTO items VALUES(NULL,?,?,?,?,?,?)", ("todo", tid, d["title"], preview, "#e8f1ff", now))
+
+        c.execute(
+            "INSERT INTO items VALUES (NULL,?,?,?,?,?,?,?)",
+            ("todo", tid, d["title"], preview, "#e8f1ff", now, 0)
+        )
+
         db.commit()
         db.close()
         return jsonify({"ok": True, "id": tid})
+
 
 @app.route("/todo/<int:id>")
 def get_todo(id):
