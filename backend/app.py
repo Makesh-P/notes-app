@@ -198,43 +198,50 @@ def save_budget():
     now = datetime.now().isoformat()
     db = get_db()
     c = db.cursor()
-    
-    # FIXED PREVIEW: Show first 2 items + total
+
+    # Build preview
     try:
-        data = json.loads(d["data"]) if d["data"] else []
+        data = json.loads(d.get("data", "[]"))
         preview_items = [item.get("item", "Item")[:20] for item in data[:2]]
-        preview = " | ".join(preview_items) + f" | Total: ₹{d.get('total', 0)}"
-        if not preview.strip():
+        preview = " | ".join(preview_items)
+        if preview:
+            preview += f" | Total: ₹{d.get('total', 0)}"
+        else:
             preview = "New budget"
     except:
         preview = "Budget items"
-    
+
+    # UPDATE existing budget
     if d.get("id") and int(d.get("id")) > 0:
-        c.execute("UPDATE budgets SET title=?, data=?, updated_at=? WHERE id=?", (d["title"], d["data"], now, d["id"]))
-        c.execute("UPDATE items SET title=?, preview=?, updated_at=? WHERE type='budget' AND ref_id=?", 
-                 (d["title"], preview, now, d["id"]))
+        c.execute(
+            "UPDATE budgets SET title=?, data=?, updated_at=? WHERE id=?",
+            (d["title"], d["data"], now, d["id"])
+        )
+        c.execute(
+            "UPDATE items SET title=?, preview=?, updated_at=? WHERE type='budget' AND ref_id=?",
+            (d["title"], preview, now, d["id"])
+        )
+        db.commit()
+        db.close()
+        return jsonify({"ok": True, "id": d["id"]})
+
+    # CREATE new budget
     else:
-        c.execute("INSERT INTO budgets VALUES (NULL,?,?,?)", (d["title"], d["data"], now))
+        c.execute(
+            "INSERT INTO budgets VALUES (NULL,?,?,?)",
+            (d["title"], d["data"], now)
+        )
         bid = c.lastrowid
-        c.execute("INSERT INTO items VALUES (NULL,?,?,?,?,?,?)", ("budget", bid, d["title"], preview, "#fff4e6", now))
+
+        c.execute(
+            "INSERT INTO items VALUES (NULL,?,?,?,?,?,?,?)",
+            ("budget", bid, d["title"], preview, "#fff4e6", now, 0)
+        )
+
         db.commit()
         db.close()
         return jsonify({"ok": True, "id": bid})
-    
-    db.commit()
-    db.close()
-    return jsonify({"ok": True})
 
-@app.route("/budget/<int:id>")
-def get_budget(id):
-    db = get_db()
-    c = db.cursor()
-    c.execute("SELECT title, data FROM budgets WHERE id=?", (id,))
-    row = c.fetchone()
-    db.close()
-    if row:
-        return jsonify({"title": row[0], "data": row[1]})
-    return jsonify({}), 404
 
 @app.route("/budget/<int:id>", methods=["DELETE"])
 def delete_budget(id):
