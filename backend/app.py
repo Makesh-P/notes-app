@@ -243,15 +243,22 @@ def save_budget():
         return jsonify({"ok": True, "id": bid})
 
 
-@app.route("/budget/<int:id>", methods=["DELETE"])
-def delete_budget(id):
+@app.route("/budget/<int:id>")
+def get_budget(id):
     db = get_db()
     c = db.cursor()
-    c.execute("DELETE FROM budgets WHERE id=?", (id,))
-    c.execute("DELETE FROM items WHERE type='budget' AND ref_id=?", (id,))
-    db.commit()
+    c.execute("SELECT title, data FROM budgets WHERE id=?", (id,))
+    row = c.fetchone()
     db.close()
-    return jsonify({"ok": True})
+
+    if row:
+        return jsonify({
+            "title": row[0],
+            "data": row[1] if row[1] else "[]"
+        })
+
+    return jsonify({}), 404
+
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
