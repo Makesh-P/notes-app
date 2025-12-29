@@ -13,6 +13,10 @@ CORS(app)
 
 DB = "notes.db"
 
+if os.environ.get("RENDER"):
+    DB = "/data/notes.db"
+
+
 def get_db():
     return sqlite3.connect(DB, check_same_thread=False)
 
