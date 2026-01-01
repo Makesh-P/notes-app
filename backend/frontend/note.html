@@ -303,6 +303,11 @@ let isSaving = false;
 const titleInput = document.getElementById("noteTitle");
 const keywordsInput = document.getElementById("keywords");
 const notesInput = document.getElementById("notes");
+
+const reminderLabel = document.getElementById("reminderLabel");
+const reminderTime = document.getElementById("reminderTime");
+const reminderList = document.getElementById("reminderList");
+
 const menu = document.getElementById("menu");
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
@@ -334,20 +339,19 @@ if (noteId) {
   renderReminders();
 }
 
-/* ================= REMINDERS UI ================= */
+/* ================= REMINDER UI ================= */
 function renderReminders() {
-  const list = document.getElementById("reminderList");
   const reminders = getReminders().filter(r => r.noteId == noteId);
 
   if (!reminders.length) {
-    list.innerHTML =
+    reminderList.innerHTML =
       `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">
         No reminders set
       </div>`;
     return;
   }
 
-  list.innerHTML = reminders.map(r => `
+  reminderList.innerHTML = reminders.map(r => `
     <div class="reminder-item">
       <div>
         <strong>${r.label}</strong><br>
@@ -385,6 +389,8 @@ function saveReminder() {
   reminderLabel.value = "";
   reminderTime.value = "";
   closePopups();
+
+  alert("Reminder saved. Keep this tab open to test.");
 }
 
 /* ================= DELETE REMINDER ================= */
@@ -400,6 +406,7 @@ function scheduleReminders() {
 
   getReminders().forEach(r => {
     if (r.triggered) return;
+
     const delay = new Date(r.time).getTime() - now;
     if (delay <= 0) return;
 
@@ -474,24 +481,12 @@ function openPopup(id) {
   document.getElementById(id).style.display = "flex";
   if (id === "reminderPopup") renderReminders();
 }
+
 function closePopups() {
   overlays.forEach(o => o.style.display = "none");
 }
-overlays.forEach(o => o.onclick = e => { if (e.target === o) closePopups(); });
-
-["font","size","color","reminder","share"].forEach(type => {
-  const item = menu.querySelector(`[title="${type.charAt(0).toUpperCase()+type.slice(1)}"]`);
-  if (item) {
-    item.onclick = e => {
-      e.stopPropagation();
-      openPopup(
-        type==="font"?"fontPopup":
-        type==="size"?"sizePopup":
-        type==="color"?"colorPopup":
-        type==="reminder"?"reminderPopup":"qrPopup"
-      );
-    };
-  }
+overlays.forEach(o => o.onclick = e => {
+  if (e.target === o) closePopups();
 });
 
 /* ================= TEXT CONTROLS ================= */
@@ -533,6 +528,7 @@ document.addEventListener("keydown", e => {
 /* ================= START ================= */
 scheduleReminders();
 </script>
+
 
 </body>
 </html>
