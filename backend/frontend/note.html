@@ -489,6 +489,23 @@ overlays.forEach(o => o.onclick = e => {
   if (e.target === o) closePopups();
 });
 
+/* ================= MENU ITEM HANDLERS ================= */
+["font","size","color","reminder","share"].forEach(type => {
+  const item = menu.querySelector(`[title="${type.charAt(0).toUpperCase() + type.slice(1)}"]`);
+  if (!item) return;
+
+  item.onclick = e => {
+    e.stopPropagation();
+    openPopup(
+      type === "font" ? "fontPopup" :
+      type === "size" ? "sizePopup" :
+      type === "color" ? "colorPopup" :
+      type === "reminder" ? "reminderPopup" :
+      "qrPopup"
+    );
+  };
+});
+
 /* ================= TEXT CONTROLS ================= */
 fontSelect.onchange = e => {
   document.querySelectorAll("textarea,input").forEach(el => el.style.fontFamily = e.target.value);
