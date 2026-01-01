@@ -2,166 +2,477 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Note Editor</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Note Editor</title>
 
 <style>
-body{font-family:Segoe UI,sans-serif;background:#f3f3f3;padding:20px}
-.sheet{background:#fff;max-width:900px;margin:auto;padding:30px;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.15)}
-.back-link{text-decoration:none;color:#666;font-weight:600}
-input,textarea{width:100%;border:none;outline:none;font-size:16px}
-textarea{resize:none;height:200px}
-.menu{position:fixed;bottom:30px;right:30px}
-.menu button{width:55px;height:55px;border-radius:50%;border:none;background:#000;color:#fff;font-size:22px;cursor:pointer}
-.popup{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}
-.box{background:#fff;padding:20px;border-radius:10px;width:320px}
-.reminder-item{display:flex;justify-content:space-between;font-size:14px;padding:6px 0}
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  font-family:Segoe UI, sans-serif;
+}
+
+body{
+  background:#f3f3f3;
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  padding:20px;
+}
+
+/* ===== SHEET ===== */
+.sheet{
+  background:#fff;
+  width:100%;
+  max-width:900px;
+  min-height:90vh;
+  padding:40px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  border-radius: 8px;
+}
+
+/* Back Button Style */
+.back-link {
+  text-decoration: none;
+  color: #666;
+  font-weight: 600;
+  margin-bottom: 20px;
+  display: inline-block;
+  font-size: 14px;
+}
+.back-link:hover { color: #000; }
+
+/* ===== TITLE ===== */
+.topic input{
+  width:100%;
+  border:none;
+  border-bottom:1px solid #aaa;
+  font-size:22px;
+  padding-bottom:6px;
+  outline:none;
+}
+
+/* ===== CONTENT ===== */
+.content{
+  display:flex;
+  flex:1;
+  margin-top:20px;
+  gap:20px;
+}
+
+.keywords{
+  width:30%;
+  border-right:1px solid #ddd;
+  padding-right:15px;
+}
+
+.notes{
+  flex:1;
+}
+
+.label{
+  font-weight:600;
+  margin-bottom:6px;
+  color: #555;
+}
+
+textarea{
+  border:none;
+  resize:none;
+  outline:none;
+  font-size:16px;
+  line-height:1.6;
+  width:100%;
+  height:100%;
+}
+
+/* ===== MENU (FIXED) ===== */
+.note-menu{
+  position:absolute;
+  bottom:25px;
+  right:25px;
+  z-index:100;
+  width: 60px;
+  height: 350px; 
+  pointer-events: none; 
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.menu-main{
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background:#000;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  cursor:pointer;
+  transition:.3s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  pointer-events: auto; 
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.note-menu.active .menu-main{
+  transform:rotate(45deg);
+  background: #333;
+}
+
+.menu-item{
+  position:absolute;
+  right:6px;
+  bottom: 0; 
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 6px 15px rgba(0,0,0,0.15);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  transform:scale(.5);
+  transition:.3s cubic-bezier(.25,1.2,.4,1);
+  cursor:pointer;
+  pointer-events: auto; 
+  z-index: 5;
+}
+
+.menu-item:hover{ background: #f0f0f0; }
+
+.note-menu.active .menu-item{ opacity:1; transform:scale(1); }
+
+.note-menu.active .font{ bottom:70px }
+.note-menu.active .size{ bottom:120px }
+.note-menu.active .color{ bottom:170px }
+.note-menu.active .reminder{ bottom:220px }
+.note-menu.active .share{ bottom:270px }
+
+/* ===== OVERLAY ===== */
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:200;
+  backdrop-filter: blur(2px);
+}
+
+.popup{
+  background:#fff;
+  padding:25px;
+  border-radius:12px;
+  width:340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+  animation:pop .25s ease;
+}
+
+@keyframes pop{
+  from{transform:scale(.9);opacity:0}
+  to{transform:scale(1);opacity:1}
+}
+
+.popup h3{margin-bottom:15px}
+
+.reminder-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 10px 0;
+}
+
+.reminder-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.reminder-item:last-child { border-bottom: none; }
+
+.delete-reminder {
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* MOBILE */
+@media(max-width:600px){
+  .sheet{padding:20px}
+  .content{flex-direction: column;}
+  .keywords{width:100%; border-right:none; border-bottom:1px solid #ddd; padding-bottom: 20px;}
+}
 </style>
 </head>
 
 <body>
-
 <div class="sheet">
-  <a href="index.html" class="back-link">← Back</a><br><br>
+  <a href="index.html" class="back-link">← Back to Home</a>
 
-  <input id="title" placeholder="Note title"><br><br>
-  <textarea id="content" placeholder="Write your note..."></textarea>
-</div>
+  <div class="topic">
+    <input id="noteTitle" placeholder="Topic">
+  </div>
 
-<div class="menu">
-  <button onclick="openReminder()">⏰</button>
-</div>
+  <div class="content">
+    <div class="keywords">
+      <div class="label">Important Keywords</div>
+      <textarea id="keywords" placeholder="Press Enter for bullets..."></textarea>
+    </div>
 
-<div class="popup" id="reminderPopup">
-  <div class="box">
-    <h3>Add Reminder</h3>
-    <input id="remLabel" placeholder="Label (Exam, Meeting)">
-    <input id="remTime" type="datetime-local"><br><br>
-    <button onclick="saveReminder()">Save</button>
-    <hr>
-    <div id="remList"></div>
+    <div class="notes">
+      <div class="label">Notes</div>
+      <textarea id="notes" placeholder="Start typing..." style="font-family: inherit; font-size: inherit; color: inherit;"></textarea>
+    </div>
+  </div>
+
+  <!-- MENU -->
+  <div class="note-menu" id="menu">
+    <div class="menu-item font" title="Font">A</div>
+    <div class="menu-item size" title="Size">Aa</div>
+    <div class="menu-item color" title="Color">🎨</div>
+    <div class="menu-item reminder" title="Reminder">⏰</div>
+    <div class="menu-item share" title="Share">🔗</div>
+    <div class="menu-main" id="menuBtn">✏️</div>
   </div>
 </div>
 
+<!-- POPUPS -->
+<div class="overlay" id="fontPopup"><div class="popup"><h3>Font</h3>
+<select id="fontSelect" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+<option value="Segoe UI,sans-serif">Segoe UI</option>
+<option value="Calibri,sans-serif">Calibri</option>
+<option value="Arial,sans-serif">Arial</option>
+<option value="'Times New Roman',serif">Times New Roman</option>
+<option value="Georgia,serif">Georgia</option>
+<option value="'Courier New',monospace">Courier New</option>
+</select></div></div>
+
+<div class="overlay" id="sizePopup"><div class="popup"><h3>Size</h3>
+<select id="sizeSelect" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+<option value="16px" selected>16px</option><option value="18px">18px</option><option value="20px">20px</option>
+</select></div></div>
+
+<div class="overlay" id="colorPopup"><div class="popup"><h3>Color</h3>
+<input type="color" id="colorPicker" style="width:100%;height:40px;cursor:pointer;">
+</div></div>
+
+<!-- REMINDER WITH LABEL INPUT -->
+<div class="overlay" id="reminderPopup"><div class="popup">
+<h3>Reminders</h3>
+<input type="text" id="reminderLabel" placeholder="Reminder label (e.g. Meeting, Deadline)" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;margin-bottom:10px;">
+<input type="datetime-local" id="reminderTime" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;margin-bottom:10px;">
+<button onclick="saveReminder()" style="width:100%;padding:10px;background:#000;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-bottom:15px;">Add Reminder</button>
+<div class="reminder-list" id="reminderList">
+  <div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>
+</div>
+</div></div>
+
+<div class="overlay" id="qrPopup"><div class="popup">
+<h3>Share</h3><p style="text-align:center;padding:20px;background:#eee;border-radius:4px;">[QR Code Generator]</p>
+</div></div>
+
 <script>
 const API = "https://notes-app-5-sgzz.onrender.com";
-const params = new URLSearchParams(location.search);
+const params = new URLSearchParams(window.location.search);
 let noteId = params.get("id");
-let timerRefs = [];
+let isSaving = false;
 
-const titleInput = document.getElementById("title");
-const contentInput = document.getElementById("content");
+const titleInput = document.getElementById("noteTitle");
+const keywordsInput = document.getElementById("keywords");
+const notesInput = document.getElementById("notes");
 
-/* ----------- LOAD NOTE ----------- */
-if(noteId){
- fetch(`${API}/note/${noteId}`)
-  .then(r=>r.json())
-  .then(d=>{
-    titleInput.value=d.title||"";
-    contentInput.value=d.content||"";
+/* ---------------- REMINDER STORAGE ---------------- */
+function getReminders() {
+  return JSON.parse(localStorage.getItem("noteReminders") || "[]");
+}
+
+function setReminders(r) {
+  localStorage.setItem("noteReminders", JSON.stringify(r));
+}
+
+/* ---------------- NOTIFICATION PERMISSION ---------------- */
+if ("Notification" in window && Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+/* ---------------- LOAD NOTE ---------------- */
+if (noteId) {
+  fetch(`${API}/note/${noteId}`)
+    .then(res => res.json())
+    .then(d => {
+      titleInput.value = d.title || "";
+      keywordsInput.value = d.keywords || "";
+      notesInput.value = d.content || "";
+      renderReminders();
+    });
+} else {
+  renderReminders();
+}
+
+/* ---------------- REMINDERS UI ---------------- */
+function renderReminders() {
+  const list = document.getElementById("reminderList");
+  const reminders = getReminders().filter(r => r.noteId == noteId);
+
+  if (!reminders.length) {
+    list.innerHTML = `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>`;
+    return;
+  }
+
+  list.innerHTML = reminders.map(r => `
+    <div class="reminder-item">
+      <div>
+        <strong>${r.label}</strong><br>
+        <small>${new Date(r.time).toLocaleString()} ${r.triggered ? "✅" : ""}</small>
+      </div>
+      ${!r.triggered ? `<button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>` : ""}
+    </div>
+  `).join("");
+}
+
+/* ---------------- ADD REMINDER ---------------- */
+function saveReminder() {
+  const label = reminderLabel.value.trim();
+  const time = reminderTime.value;
+
+  if (!label || !time) return alert("Label & time required");
+  if (!noteId) return alert("Save note first");
+
+  const reminders = getReminders();
+
+  reminders.push({
+    id: Date.now(),
+    noteId: Number(noteId),
+    label,
+    time,
+    triggered: false
+  });
+
+  setReminders(reminders);
+  scheduleReminder();
+  renderReminders();
+  saveNote(true);
+
+  reminderLabel.value = "";
+  reminderTime.value = "";
+  closePopups();
+}
+
+/* ---------------- DELETE REMINDER ---------------- */
+function deleteReminder(id) {
+  setReminders(getReminders().filter(r => r.id !== id));
+  renderReminders();
+  saveNote(true);
+}
+
+/* ---------------- REMINDER ENGINE ---------------- */
+function scheduleReminder() {
+  const now = Date.now();
+
+  getReminders().forEach(r => {
+    if (r.triggered) return;
+
+    const delay = new Date(r.time).getTime() - now;
+    if (delay <= 0) return;
+
+    setTimeout(() => {
+      fireReminder(r);
+    }, delay);
   });
 }
 
-/* ----------- SAVE NOTE ----------- */
-function saveNote(){
- fetch(`${API}/note`,{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({
-    id: noteId?Number(noteId):null,
-    title:titleInput.value,
-    keywords:"",
-    content:contentInput.value
-  })
- })
- .then(r=>r.json())
- .then(d=>{
-   if(!noteId){
-     noteId=d.id;
-     history.replaceState(null,"",`note.html?id=${noteId}`);
-   }
- });
+function fireReminder(r) {
+  if (Notification.permission !== "granted") return;
+
+  const n = new Notification("📝 Note Reminder", {
+    body: r.label,
+    tag: "note-" + r.id
+  });
+
+  n.onclick = () => {
+    window.focus();
+    location.href = `note.html?id=${r.noteId}`;
+  };
+
+  const reminders = getReminders();
+  const i = reminders.findIndex(x => x.id === r.id);
+  if (i !== -1) reminders[i].triggered = true;
+  setReminders(reminders);
+
+  saveNote(true);
 }
+
+/* ---------------- SAVE NOTE ---------------- */
+function saveNote(silent=false) {
+  if (isSaving) return;
+
+  const title = titleInput.value.trim();
+  const keywords = keywordsInput.value.trim();
+  const content = notesInput.value.trim();
+  if (!title && !content && !keywords) return;
+
+  isSaving = true;
+
+  const reminderCount = getReminders()
+    .filter(r => r.noteId == noteId && !r.triggered).length;
+
+  fetch(`${API}/note`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: noteId ? Number(noteId) : null,
+      title,
+      keywords,
+      content,
+      reminderCount
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.id) {
+      noteId = d.id;
+      history.replaceState(null,"",`note.html?id=${noteId}`);
+    }
+    if (!silent) alert("Note Saved ✔");
+  })
+  .finally(()=>isSaving=false);
+}
+
+/* ---------------- SHORTCUTS ---------------- */
+setInterval(()=>saveNote(true),30000);
 
 document.addEventListener("keydown",e=>{
- if(e.ctrlKey && e.key==="s"){
-  e.preventDefault();
-  saveNote();
-  setTimeout(()=>location.href="index.html",1200);
- }
+  if(e.ctrlKey && e.key==="s"){
+    e.preventDefault();
+    saveNote();
+    setTimeout(()=>location.href="index.html",1200);
+  }
 });
 
-/* ----------- REMINDERS ----------- */
-function getReminders(){
- return JSON.parse(localStorage.getItem("noteReminders")||"[]");
-}
-function setReminders(r){
- localStorage.setItem("noteReminders",JSON.stringify(r));
-}
-
-function openReminder(){
- if(!noteId){ alert("Save note first"); return; }
- document.getElementById("reminderPopup").style.display="flex";
- renderReminders();
-}
-
-function saveReminder(){
- const label=document.getElementById("remLabel").value;
- const time=document.getElementById("remTime").value;
- if(!label||!time) return alert("Fill all fields");
-
- const all=getReminders();
- all.push({
-  id:Date.now(),
-  noteId,
-  label,
-  time,
-  fired:false
- });
- setReminders(all);
- document.getElementById("remLabel").value="";
- document.getElementById("remTime").value="";
- renderReminders();
- scheduleReminders();
-}
-
-function renderReminders(){
- const list=document.getElementById("remList");
- const r=getReminders().filter(x=>x.noteId==noteId);
- if(!r.length){list.innerHTML="<small>No reminders</small>";return;}
- list.innerHTML=r.map(x=>`
-  <div class="reminder-item">
-   <span>${x.label}</span>
-   <button onclick="delReminder(${x.id})">✖</button>
-  </div>`).join("");
-}
-
-function delReminder(id){
- setReminders(getReminders().filter(r=>r.id!==id));
- renderReminders();
-}
-
-function scheduleReminders(){
- timerRefs.forEach(clearTimeout);
- timerRefs=[];
- getReminders().forEach(r=>{
-  if(r.fired) return;
-  const delay=new Date(r.time)-Date.now();
-  if(delay>0){
-   timerRefs.push(setTimeout(()=>{
-    new Notification("Note Reminder",{body:r.label});
-    r.fired=true;
-    setReminders(getReminders().map(x=>x.id===r.id?r:x));
-   },delay));
-  }
- });
-}
-
-if("Notification"in window && Notification.permission!=="granted"){
- Notification.requestPermission();
-}
-
-scheduleReminders();
+scheduleReminder();
 </script>
+
+
 </body>
 </html>
