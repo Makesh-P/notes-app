@@ -293,242 +293,37 @@ textarea{
 </div></div>
 
 <script>
+/* ================= CONFIG ================= */
 const API = "https://notes-app-5-sgzz.onrender.com";
-const REMINDER_LOCK_KEY = "reminderLock";
 const params = new URLSearchParams(window.location.search);
 let noteId = params.get("id");
 let isSaving = false;
 
-// ✅ FIXED: Declare ALL input variables
+/* ================= ELEMENTS ================= */
 const titleInput = document.getElementById("noteTitle");
 const keywordsInput = document.getElementById("keywords");
 const notesInput = document.getElementById("notes");
-
-// ✅ SHARED REMINDER STORAGE - Self-contained fallback
-function getGlobalReminders() {
-  return JSON.parse(localStorage.getItem('allNoteReminders') || '[]');
-}
-
-function setGlobalReminders(reminders) {
-  localStorage.setItem('allNoteReminders', JSON.stringify(reminders));
-}
-
-// Request notification permission
-
-
-// LOAD NOTE
-if (noteId) {
-  fetch(`${API}/note/${noteId}`)
-    .then(res => res.json())
-    .then(data => {
-      titleInput.value = data.title || "";
-      keywordsInput.value = data.keywords || "";
-      notesInput.value = data.content || "";
-      loadReminders();
-    })
-    .catch(err => console.error(err));
-} else {
-  loadReminders();
-}
-
-// ✅ FIXED GLOBAL REMINDER FUNCTIONS - Work standalone OR with index.html
-function loadReminders() {
-  const list = document.getElementById("reminderList");
-  const noteReminders = window.getNoteReminders ? 
-    window.getNoteReminders(noteId) : 
-    getGlobalReminders().filter(r => r.noteId == noteId);
-  
-  if (noteReminders.length === 0) {
-    list.innerHTML = '<div style="text-align:center;color:#888;font-size:12px;padding:20px;">No reminders set</div>';
-    return;
-  }
-  
-  list.innerHTML = noteReminders.map(r => `
-    <div class="reminder-item">
-      <div>
-        <strong>${r.label}</strong><br>
-        <small>${new Date(r.time).toLocaleString()}${r.triggered ? ' ✅' : ''}</small>
-      </div>
-      ${!r.triggered ? `<button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>` : ''}
-    </div>
-  `).join("");
-}
-
-function saveReminder() {
-  const label = document.getElementById("reminderLabel").value.trim();
-  const time = document.getElementById("reminderTime").value;
-  
-  if (!label) return alert("Please enter reminder label");
-  if (!time) return alert("Please select time");
-  if (!noteId) return alert("Save note first (Ctrl+S)");
-  
- const reminders = JSON.parse(localStorage.getItem("allNoteReminders") || "[]");
-
-reminders.push({
-  id: Date.now(),
-  noteId: Number(noteId),
-  label,
-  time,
-  triggered: false
-});
-
-localStorage.setItem("allNoteReminders", JSON.stringify(reminders));
-
-  
-  loadReminders();
-  saveNote(true);
-  
-  document.getElementById("reminderLabel").value = "";
-  document.getElementById("reminderTime").value = "";
-  closePopups();
-  
-  alert(`✅ "${label}" set for ${new Date(time).toLocaleString()}`);
-}
-
-function deleteReminder(id) {
-  if (window.deleteNoteReminder) {
-    window.deleteNoteReminder(id);
-  } else {
-    const reminders = getGlobalReminders();
-    const updated = reminders.filter(r => r.id != id);
-    setGlobalReminders(updated);
-  }
-  loadReminders();
-  saveNote(true);
-}
-
-function saveNote(silent = false) {
-  if (isSaving) return;
-  
-  const title = titleInput.value.trim();
-  const keywords = keywordsInput.value.trim();
-  const content = notesInput.value.trim();
-
-  if (!title && !content && !keywords) return;
-
-  isSaving = true;
-  
-  // ✅ FIXED: Safe reminder count
-  let activeCount = 0;
-  if (window.getNoteReminders && noteId) {
-    activeCount = window.getNoteReminders(noteId).filter(r => !r.triggered).length;
-  } else if (noteId) {
-    const reminders = getGlobalReminders();
-    activeCount = reminders.filter(r => r.noteId == noteId && !r.triggered).length;
-  }
-  
-  fetch(`${API}/note`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: noteId ? parseInt(noteId) : null,
-      title,
-      keywords,
-      content,
-      reminderCount: activeCount
-    })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.ok && data.id) {
-      noteId = data.id.toString();
-      history.replaceState(null, "", `note.html?id=${noteId}`);
-    }
-    if (!silent) alert("Note Saved ✔");
-  })
-  .finally(() => isSaving = false);
-}
-
-// UI LOGIC (UNCHANGED)
 const menu = document.getElementById("menu");
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
 
-menuBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
-window.onclick = e => { if (!menu.contains(e.target)) menu.classList.remove("active"); };
-
-function openPopup(id) {
-  menu.classList.remove("active");
-  closePopups();
-  document.getElementById(id).style.display = "flex";
-  if (id === "reminderPopup") loadReminders();
-}
-
-function closePopups() {
-  overlays.forEach(o => o.style.display = "none");
-}
-
-overlays.forEach(o => o.onclick = e => { if (e.target === o) closePopups(); });
-
-["font", "size", "color", "reminder", "share"].forEach(type => {
-  const item = menu.querySelector(`[title="${type.charAt(0).toUpperCase() + type.slice(1)}"]`);
-  if (item) {
-    item.onclick = e => {
-      e.stopPropagation();
-      openPopup(type === "font" ? "fontPopup" : 
-                type === "size" ? "sizePopup" : 
-                type === "color" ? "colorPopup" : 
-                type === "reminder" ? "reminderPopup" : "qrPopup");
-    };
-  }
-});
-
-document.getElementById("fontSelect").onchange = e => {
-  document.querySelectorAll("textarea,input").forEach(el => el.style.fontFamily = e.target.value);
-  closePopups();
-};
-
-document.getElementById("sizeSelect").onchange = e => {
-  document.querySelectorAll("textarea").forEach(el => el.style.fontSize = e.target.value);
-  closePopups();
-};
-
-document.getElementById("colorPicker").oninput = e => {
-  document.querySelectorAll("textarea").forEach(el => el.style.color = e.target.value);
-  closePopups();
-};
-
-keywordsInput.onkeydown = e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    const start = keywordsInput.selectionStart;
-    keywordsInput.value = keywordsInput.value.substring(0, start) + "\n• " + keywordsInput.value.substring(keywordsInput.selectionEnd);
-    keywordsInput.selectionStart = keywordsInput.selectionEnd = start + 3;
-  }
-};
-
-// Auto-save every 30s
-setInterval(() => saveNote(true), 30000);
-
-// CTRL+S
-document.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key === "s") {
-    e.preventDefault();
-    saveNote(false);
-    setTimeout(() => {
-      if (noteId) window.location.href = "index.html";
-    }, 1500);
-  }
-});
-
-/* ---------------- REMINDER STORAGE ---------------- */
+/* ================= REMINDER STORAGE ================= */
 function getReminders() {
   return JSON.parse(localStorage.getItem("noteReminders") || "[]");
 }
-
 function setReminders(r) {
   localStorage.setItem("noteReminders", JSON.stringify(r));
 }
 
-/* ---------------- NOTIFICATION PERMISSION ---------------- */
+/* ================= NOTIFICATION PERMISSION ================= */
 if ("Notification" in window && Notification.permission !== "granted") {
   Notification.requestPermission();
 }
 
-/* ---------------- LOAD NOTE ---------------- */
+/* ================= LOAD NOTE ================= */
 if (noteId) {
   fetch(`${API}/note/${noteId}`)
-    .then(res => res.json())
+    .then(r => r.json())
     .then(d => {
       titleInput.value = d.title || "";
       keywordsInput.value = d.keywords || "";
@@ -539,13 +334,16 @@ if (noteId) {
   renderReminders();
 }
 
-/* ---------------- REMINDERS UI ---------------- */
+/* ================= REMINDERS UI ================= */
 function renderReminders() {
   const list = document.getElementById("reminderList");
   const reminders = getReminders().filter(r => r.noteId == noteId);
 
   if (!reminders.length) {
-    list.innerHTML = `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>`;
+    list.innerHTML =
+      `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">
+        No reminders set
+      </div>`;
     return;
   }
 
@@ -555,21 +353,22 @@ function renderReminders() {
         <strong>${r.label}</strong><br>
         <small>${new Date(r.time).toLocaleString()} ${r.triggered ? "✅" : ""}</small>
       </div>
-      ${!r.triggered ? `<button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>` : ""}
+      ${!r.triggered
+        ? `<button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>`
+        : ""}
     </div>
   `).join("");
 }
 
-/* ---------------- ADD REMINDER ---------------- */
+/* ================= ADD REMINDER ================= */
 function saveReminder() {
   const label = reminderLabel.value.trim();
   const time = reminderTime.value;
 
   if (!label || !time) return alert("Label & time required");
-  if (!noteId) return alert("Save note first");
+  if (!noteId) return alert("Save note first (Ctrl+S)");
 
   const reminders = getReminders();
-
   reminders.push({
     id: Date.now(),
     noteId: Number(noteId),
@@ -579,7 +378,7 @@ function saveReminder() {
   });
 
   setReminders(reminders);
-  scheduleReminder();
+  scheduleReminders();
   renderReminders();
   saveNote(true);
 
@@ -588,26 +387,23 @@ function saveReminder() {
   closePopups();
 }
 
-/* ---------------- DELETE REMINDER ---------------- */
+/* ================= DELETE REMINDER ================= */
 function deleteReminder(id) {
   setReminders(getReminders().filter(r => r.id !== id));
   renderReminders();
   saveNote(true);
 }
 
-/* ---------------- REMINDER ENGINE ---------------- */
-function scheduleReminder() {
+/* ================= REMINDER ENGINE ================= */
+function scheduleReminders() {
   const now = Date.now();
 
   getReminders().forEach(r => {
     if (r.triggered) return;
-
     const delay = new Date(r.time).getTime() - now;
     if (delay <= 0) return;
 
-    setTimeout(() => {
-      fireReminder(r);
-    }, delay);
+    setTimeout(() => fireReminder(r), delay);
   });
 }
 
@@ -632,8 +428,8 @@ function fireReminder(r) {
   saveNote(true);
 }
 
-/* ---------------- SAVE NOTE ---------------- */
-function saveNote(silent=false) {
+/* ================= SAVE NOTE ================= */
+function saveNote(silent = false) {
   if (isSaving) return;
 
   const title = titleInput.value.trim();
@@ -661,27 +457,81 @@ function saveNote(silent=false) {
   .then(d => {
     if (d.id) {
       noteId = d.id;
-      history.replaceState(null,"",`note.html?id=${noteId}`);
+      history.replaceState(null, "", `note.html?id=${noteId}`);
     }
     if (!silent) alert("Note Saved ✔");
   })
-  .finally(()=>isSaving=false);
+  .finally(() => isSaving = false);
 }
 
-/* ---------------- SHORTCUTS ---------------- */
-setInterval(()=>saveNote(true),30000);
+/* ================= MENU LOGIC (UNCHANGED) ================= */
+menuBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
+window.onclick = e => { if (!menu.contains(e.target)) menu.classList.remove("active"); };
 
-document.addEventListener("keydown",e=>{
-  if(e.ctrlKey && e.key==="s"){
-    e.preventDefault();
-    saveNote();
-    setTimeout(()=>location.href="index.html",1200);
+function openPopup(id) {
+  menu.classList.remove("active");
+  closePopups();
+  document.getElementById(id).style.display = "flex";
+  if (id === "reminderPopup") renderReminders();
+}
+function closePopups() {
+  overlays.forEach(o => o.style.display = "none");
+}
+overlays.forEach(o => o.onclick = e => { if (e.target === o) closePopups(); });
+
+["font","size","color","reminder","share"].forEach(type => {
+  const item = menu.querySelector(`[title="${type.charAt(0).toUpperCase()+type.slice(1)}"]`);
+  if (item) {
+    item.onclick = e => {
+      e.stopPropagation();
+      openPopup(
+        type==="font"?"fontPopup":
+        type==="size"?"sizePopup":
+        type==="color"?"colorPopup":
+        type==="reminder"?"reminderPopup":"qrPopup"
+      );
+    };
   }
 });
 
-scheduleReminder();
+/* ================= TEXT CONTROLS ================= */
+fontSelect.onchange = e => {
+  document.querySelectorAll("textarea,input").forEach(el => el.style.fontFamily = e.target.value);
+  closePopups();
+};
+sizeSelect.onchange = e => {
+  document.querySelectorAll("textarea").forEach(el => el.style.fontSize = e.target.value);
+  closePopups();
+};
+colorPicker.oninput = e => {
+  document.querySelectorAll("textarea").forEach(el => el.style.color = e.target.value);
+  closePopups();
+};
 
-loadReminders();
+keywordsInput.onkeydown = e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const s = keywordsInput.selectionStart;
+    keywordsInput.value =
+      keywordsInput.value.substring(0, s) + "\n• " +
+      keywordsInput.value.substring(keywordsInput.selectionEnd);
+    keywordsInput.selectionStart = keywordsInput.selectionEnd = s + 3;
+  }
+};
+
+/* ================= AUTOSAVE & SHORTCUT ================= */
+setInterval(() => saveNote(true), 30000);
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "s") {
+    e.preventDefault();
+    saveNote(false);
+    setTimeout(() => noteId && (location.href = "index.html"), 1200);
+  }
+});
+
+/* ================= START ================= */
+scheduleReminders();
 </script>
 
 </body>
