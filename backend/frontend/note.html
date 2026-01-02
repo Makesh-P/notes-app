@@ -483,6 +483,23 @@ document.addEventListener("keydown", e => {
     setTimeout(() => noteId && (location.href = "index.html"), 1200);
   }
 });
+/* ================= FIX: MENU ITEM CLICK HANDLERS ================= */
+["font","size","color","reminder","share"].forEach(type => {
+  const item = document.querySelector(`.menu-item.${type}`);
+  if (!item) return;
+
+  item.onclick = e => {
+    e.stopPropagation();
+    openPopup(
+      type === "font" ? "fontPopup" :
+      type === "size" ? "sizePopup" :
+      type === "color" ? "colorPopup" :
+      type === "reminder" ? "reminderPopup" :
+      "qrPopup"
+    );
+  };
+});
+
 </script>
 
 
