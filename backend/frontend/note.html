@@ -299,6 +299,11 @@ const params = new URLSearchParams(window.location.search);
 let noteId = params.get("id");
 let isSaving = false;
 
+/* ================= SERVICE WORKER ================= */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
 /* ================= ELEMENTS ================= */
 const titleInput = document.getElementById("noteTitle");
 const keywordsInput = document.getElementById("keywords");
@@ -312,7 +317,7 @@ const menu = document.getElementById("menu");
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
 
-/* ================= REMINDER STORAGE ================= */
+/* ================= STORAGE ================= */
 function getReminders() {
   return JSON.parse(localStorage.getItem("noteReminders") || "[]");
 }
@@ -320,7 +325,7 @@ function setReminders(r) {
   localStorage.setItem("noteReminders", JSON.stringify(r));
 }
 
-/* ================= NOTIFICATION PERMISSION ================= */
+/* ================= PERMISSION ================= */
 if ("Notification" in window && Notification.permission !== "granted") {
   Notification.requestPermission();
 }
@@ -355,11 +360,9 @@ function renderReminders() {
     <div class="reminder-item">
       <div>
         <strong>${r.label}</strong><br>
-        <small>${new Date(r.time).toLocaleString()} ${r.triggered ? "✅" : ""}</small>
+        <small>${new Date(r.time).toLocaleString()}</small>
       </div>
-      ${!r.triggered
-        ? `<button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>`
-        : ""}
+      <button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>
     </div>
   `).join("");
 }
@@ -378,11 +381,10 @@ function saveReminder() {
     noteId: Number(noteId),
     label,
     time,
-    triggered: false
+    fired: false
   });
 
   setReminders(reminders);
-  scheduleReminders();
   renderReminders();
   saveNote(true);
 
@@ -390,7 +392,7 @@ function saveReminder() {
   reminderTime.value = "";
   closePopups();
 
-  alert("Reminder saved. Keep this tab open to test.");
+  alert("Reminder set ✔");
 }
 
 /* ================= DELETE REMINDER ================= */
@@ -400,40 +402,26 @@ function deleteReminder(id) {
   saveNote(true);
 }
 
-/* ================= REMINDER ENGINE ================= */
-function scheduleReminders() {
+/* ================= REMINDER ENGINE (REAL) ================= */
+setInterval(() => {
   const now = Date.now();
-
-  getReminders().forEach(r => {
-    if (r.triggered) return;
-
-    const delay = new Date(r.time).getTime() - now;
-    if (delay <= 0) return;
-
-    setTimeout(() => fireReminder(r), delay);
-  });
-}
-
-function fireReminder(r) {
-  if (Notification.permission !== "granted") return;
-
-  const n = new Notification("📝 Note Reminder", {
-    body: r.label,
-    tag: "note-" + r.id
-  });
-
-  n.onclick = () => {
-    window.focus();
-    location.href = `note.html?id=${r.noteId}`;
-  };
-
   const reminders = getReminders();
-  const i = reminders.findIndex(x => x.id === r.id);
-  if (i !== -1) reminders[i].triggered = true;
-  setReminders(reminders);
 
-  saveNote(true);
-}
+  reminders.forEach(r => {
+    if (r.fired) return;
+    if (new Date(r.time).getTime() <= now) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification("📝 Note Reminder", {
+          body: r.label,
+          data: { noteId: r.noteId }
+        });
+      });
+      r.fired = true;
+    }
+  });
+
+  setReminders(reminders);
+}, 60000);
 
 /* ================= SAVE NOTE ================= */
 function saveNote(silent = false) {
@@ -446,9 +434,6 @@ function saveNote(silent = false) {
 
   isSaving = true;
 
-  const reminderCount = getReminders()
-    .filter(r => r.noteId == noteId && !r.triggered).length;
-
   fetch(`${API}/note`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -456,8 +441,7 @@ function saveNote(silent = false) {
       id: noteId ? Number(noteId) : null,
       title,
       keywords,
-      content,
-      reminderCount
+      content
     })
   })
   .then(r => r.json())
@@ -471,7 +455,7 @@ function saveNote(silent = false) {
   .finally(() => isSaving = false);
 }
 
-/* ================= MENU LOGIC (UNCHANGED) ================= */
+/* ================= MENU LOGIC ================= */
 menuBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
 window.onclick = e => { if (!menu.contains(e.target)) menu.classList.remove("active"); };
 
@@ -489,49 +473,7 @@ overlays.forEach(o => o.onclick = e => {
   if (e.target === o) closePopups();
 });
 
-/* ================= MENU ITEM HANDLERS ================= */
-["font","size","color","reminder","share"].forEach(type => {
-  const item = menu.querySelector(`[title="${type.charAt(0).toUpperCase() + type.slice(1)}"]`);
-  if (!item) return;
-
-  item.onclick = e => {
-    e.stopPropagation();
-    openPopup(
-      type === "font" ? "fontPopup" :
-      type === "size" ? "sizePopup" :
-      type === "color" ? "colorPopup" :
-      type === "reminder" ? "reminderPopup" :
-      "qrPopup"
-    );
-  };
-});
-
-/* ================= TEXT CONTROLS ================= */
-fontSelect.onchange = e => {
-  document.querySelectorAll("textarea,input").forEach(el => el.style.fontFamily = e.target.value);
-  closePopups();
-};
-sizeSelect.onchange = e => {
-  document.querySelectorAll("textarea").forEach(el => el.style.fontSize = e.target.value);
-  closePopups();
-};
-colorPicker.oninput = e => {
-  document.querySelectorAll("textarea").forEach(el => el.style.color = e.target.value);
-  closePopups();
-};
-
-keywordsInput.onkeydown = e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    const s = keywordsInput.selectionStart;
-    keywordsInput.value =
-      keywordsInput.value.substring(0, s) + "\n• " +
-      keywordsInput.value.substring(keywordsInput.selectionEnd);
-    keywordsInput.selectionStart = keywordsInput.selectionEnd = s + 3;
-  }
-};
-
-/* ================= AUTOSAVE & SHORTCUT ================= */
+/* ================= SHORTCUT ================= */
 setInterval(() => saveNote(true), 30000);
 
 document.addEventListener("keydown", e => {
@@ -541,10 +483,8 @@ document.addEventListener("keydown", e => {
     setTimeout(() => noteId && (location.href = "index.html"), 1200);
   }
 });
-
-/* ================= START ================= */
-scheduleReminders();
 </script>
+
 
 
 </body>
