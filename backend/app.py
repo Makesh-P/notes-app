@@ -225,6 +225,49 @@ def check_reminders():
         try:
             db = get_db()
             c = db.cursor()
+            # PostgreSQL: use CURRENT_TIMESTAMP to be timezone-safe
+            c.execute("""
+                SELECT id, note_id, label 
+                FROM reminders 
+                WHERE remind_at <= CURRENT_TIMESTAMP AND is_sent = FALSE
+            """)
+            due_reminders = c.fetchall()
+
+            if due_reminders:
+                c.execute("SELECT sub_data FROM subscriptions")
+                subs = c.fetchall()
+
+                for reminder in due_reminders:
+                    rem_id, note_id, label = reminder
+                    payload = json.dumps({
+                        "title": "📝 Note Reminder",
+                        "body": label,
+                        "url": f"/note.html?id={note_id}"
+                    })
+
+                    for sub in subs:
+                        try:
+                            webpush(
+                                subscription_info=json.loads(sub[0]),
+                                data=payload,
+                                vapid_private_key=VAPID_PRIVATE_KEY,
+                                vapid_claims=VAPID_CLAIMS
+                            )
+                        except WebPushException as ex:
+                            print(f"WebPush error: {ex}")
+                        except Exception as e:
+                            print(f"Generic Push error: {e}")
+
+                    c.execute("UPDATE reminders SET is_sent = TRUE WHERE id = %s", (rem_id,))
+                    db.commit()
+            db.close()
+        except Exception as e:
+            print(f"Scheduler loop error: {e}")
+        time.sleep(20) # Checked slightly faster
+    while True:
+        try:
+            db = get_db()
+            c = db.cursor()
             # PostgreSQL requires NOW() at UTC or specific timezone depending on your input
             c.execute("SELECT id, note_id, label FROM reminders WHERE remind_at <= CURRENT_TIMESTAMP AND is_sent = FALSE")
             due_reminders = c.fetchall()
