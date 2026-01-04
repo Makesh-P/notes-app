@@ -294,43 +294,68 @@ textarea{
 
 <script>
 /* ================= CONFIG ================= */
-const API = "https://notes-app-5-sgzz.onrender.com";
+const API = "https://notes-app-5-sgzz.onrender.com"; // Your API URL
 const params = new URLSearchParams(window.location.search);
 let noteId = params.get("id");
 let isSaving = false;
 
-/* ================= SERVICE WORKER ================= */
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+// PASTE YOUR GENERATED PUBLIC KEY HERE
+const PUBLIC_VAPID_KEY = "BCjE7S3Qg5wOKbwx1Sirc5ElWzhKFjNMfEWUQskfdwNoyQg026mlf6e6-1TvAod_cwaN1oh-Unr6klWxruhi-IY"; 
+
+/* ================= SERVICE WORKER & PUSH ================= */
+// 1. Convert Key Helper
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
 }
+
+// 2. Register & Subscribe
+async function setupPushNotifications() {
+  if (!('serviceWorker' in navigator)) return;
+
+  const register = await navigator.serviceWorker.register('sw.js');
+  await navigator.serviceWorker.ready;
+
+  // Check if already subscribed
+  let subscription = await register.pushManager.getSubscription();
+
+  // If not, subscribe
+  if (!subscription) {
+    subscription = await register.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+    });
+  }
+
+  // Send subscription to Backend
+  await fetch(`${API}/subscribe`, {
+    method: 'POST',
+    body: JSON.stringify(subscription),
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+// Trigger setup on load
+setupPushNotifications().catch(err => console.error("Push setup failed", err));
 
 /* ================= ELEMENTS ================= */
 const titleInput = document.getElementById("noteTitle");
 const keywordsInput = document.getElementById("keywords");
 const notesInput = document.getElementById("notes");
-
 const reminderLabel = document.getElementById("reminderLabel");
 const reminderTime = document.getElementById("reminderTime");
 const reminderList = document.getElementById("reminderList");
-
 const menu = document.getElementById("menu");
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
 
-/* ================= STORAGE ================= */
-function getReminders() {
-  return JSON.parse(localStorage.getItem("noteReminders") || "[]");
-}
-function setReminders(r) {
-  localStorage.setItem("noteReminders", JSON.stringify(r));
-}
-
-/* ================= PERMISSION ================= */
-if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission();
-}
-
-/* ================= LOAD NOTE ================= */
+/* ================= LOAD DATA ================= */
 if (noteId) {
   fetch(`${API}/note/${noteId}`)
     .then(r => r.json())
@@ -338,24 +363,26 @@ if (noteId) {
       titleInput.value = d.title || "";
       keywordsInput.value = d.keywords || "";
       notesInput.value = d.content || "";
-      renderReminders();
+      loadReminders(); // Load from DB
     });
 } else {
-  renderReminders();
+  // New note, no reminders yet
 }
 
-/* ================= REMINDER UI ================= */
-function renderReminders() {
-  const reminders = getReminders().filter(r => r.noteId == noteId);
+/* ================= REMINDER LOGIC (SERVER-SIDE) ================= */
 
+function loadReminders() {
+  if (!noteId) return;
+  fetch(`${API}/reminders/${noteId}`)
+    .then(r => r.json())
+    .then(data => renderReminders(data));
+}
+
+function renderReminders(reminders) {
   if (!reminders.length) {
-    reminderList.innerHTML =
-      `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">
-        No reminders set
-      </div>`;
+    reminderList.innerHTML = `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>`;
     return;
   }
-
   reminderList.innerHTML = reminders.map(r => `
     <div class="reminder-item">
       <div>
@@ -367,7 +394,6 @@ function renderReminders() {
   `).join("");
 }
 
-/* ================= ADD REMINDER ================= */
 function saveReminder() {
   const label = reminderLabel.value.trim();
   const time = reminderTime.value;
@@ -375,58 +401,30 @@ function saveReminder() {
   if (!label || !time) return alert("Label & time required");
   if (!noteId) return alert("Save note first (Ctrl+S)");
 
-  const reminders = getReminders();
-  reminders.push({
-    id: Date.now(),
-    noteId: Number(noteId),
-    label,
-    time,
-    fired: false
+  // Send to Backend
+  fetch(`${API}/reminders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ noteId, label, time })
+  })
+  .then(() => {
+    alert("Reminder Set! It will notify you even if closed.");
+    reminderLabel.value = "";
+    reminderTime.value = "";
+    loadReminders(); // Refresh list
+    closePopups();
   });
-
-  setReminders(reminders);
-  renderReminders();
-  saveNote(true);
-
-  reminderLabel.value = "";
-  reminderTime.value = "";
-  closePopups();
-
-  alert("Reminder set ✔");
 }
 
-/* ================= DELETE REMINDER ================= */
 function deleteReminder(id) {
-  setReminders(getReminders().filter(r => r.id !== id));
-  renderReminders();
-  saveNote(true);
+  fetch(`${API}/reminders/${id}`, { method: "DELETE" })
+    .then(() => loadReminders());
 }
-
-/* ================= REMINDER ENGINE (REAL) ================= */
-setInterval(() => {
-  const now = Date.now();
-  const reminders = getReminders();
-
-  reminders.forEach(r => {
-    if (r.fired) return;
-    if (new Date(r.time).getTime() <= now) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification("📝 Note Reminder", {
-          body: r.label,
-          data: { noteId: r.noteId }
-        });
-      });
-      r.fired = true;
-    }
-  });
-
-  setReminders(reminders);
-}, 60000);
 
 /* ================= SAVE NOTE ================= */
+// (Keep your existing saveNote logic here exactly as it was)
 function saveNote(silent = false) {
   if (isSaving) return;
-
   const title = titleInput.value.trim();
   const keywords = keywordsInput.value.trim();
   const content = notesInput.value.trim();
@@ -451,11 +449,13 @@ function saveNote(silent = false) {
       history.replaceState(null, "", `note.html?id=${noteId}`);
     }
     if (!silent) alert("Note Saved ✔");
+    loadReminders(); // Refresh reminders in case note ID changed
   })
   .finally(() => isSaving = false);
 }
 
-/* ================= MENU LOGIC ================= */
+/* ================= UI LOGIC ================= */
+// (Keep your existing Menu/Popup logic exactly as it was)
 menuBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
 window.onclick = e => { if (!menu.contains(e.target)) menu.classList.remove("active"); };
 
@@ -463,31 +463,27 @@ function openPopup(id) {
   menu.classList.remove("active");
   closePopups();
   document.getElementById(id).style.display = "flex";
-  if (id === "reminderPopup") renderReminders();
+  if (id === "reminderPopup") loadReminders();
 }
 
 function closePopups() {
   overlays.forEach(o => o.style.display = "none");
 }
-overlays.forEach(o => o.onclick = e => {
-  if (e.target === o) closePopups();
-});
+overlays.forEach(o => o.onclick = e => { if (e.target === o) closePopups(); });
 
 /* ================= SHORTCUT ================= */
 setInterval(() => saveNote(true), 30000);
-
 document.addEventListener("keydown", e => {
   if (e.ctrlKey && e.key === "s") {
     e.preventDefault();
     saveNote(false);
-    setTimeout(() => noteId && (location.href = "index.html"), 1200);
   }
 });
-/* ================= FIX: MENU ITEM CLICK HANDLERS ================= */
+
+/* ================= MENU HANDLERS ================= */
 ["font","size","color","reminder","share"].forEach(type => {
   const item = document.querySelector(`.menu-item.${type}`);
   if (!item) return;
-
   item.onclick = e => {
     e.stopPropagation();
     openPopup(
@@ -499,9 +495,7 @@ document.addEventListener("keydown", e => {
     );
   };
 });
-
 </script>
-
 
 
 </body>

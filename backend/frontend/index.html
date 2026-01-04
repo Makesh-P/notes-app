@@ -135,31 +135,6 @@ const REMINDER_LOCK_KEY = "reminderLock";
 // ✅ SHARED REMINDER STORAGE - Works across all tabs
 let allReminders = JSON.parse(localStorage.getItem('allNoteReminders') || '[]');
 
-function checkAllReminders() {
-  const now = Date.now();
-  let reminders = JSON.parse(localStorage.getItem("allNoteReminders") || "[]");
-
-  const lock = localStorage.getItem(REMINDER_LOCK_KEY);
-  if (lock && Date.now() - lock < 5000) return;
-
-  let changed = false;
-
-  reminders.forEach(r => {
-    if (!r.triggered && now >= new Date(r.time).getTime()) {
-      localStorage.setItem(REMINDER_LOCK_KEY, Date.now());
-      r.triggered = true;
-      showGlobalNotification(r);
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    localStorage.setItem("allNoteReminders", JSON.stringify(reminders));
-    loadHome();
-  }
-}
-
-
 // ✅ FIXED loadHome()
 function loadHome() {
   fetch(`${API}/home`)
@@ -231,8 +206,6 @@ if ("Notification" in window && Notification.permission === "default") {
 }
 
 // Start reminder engine
-setInterval(checkAllReminders, 30000);
-checkAllReminders();
 loadHome();
 
 const magicMenu = document.getElementById("magicMenu");
