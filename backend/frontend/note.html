@@ -342,6 +342,20 @@ const reminderLabel = document.getElementById("reminderLabel");
 const reminderTime = document.getElementById("reminderTime");
 const reminderList = document.getElementById("reminderList");
 const menu = document.getElementById("menu");
+/* ================= MENU CLICK FIX ================= */
+
+/* Prevent menu clicks from closing itself */
+menu.addEventListener("click", e => {
+  e.stopPropagation();
+});
+
+/* Ensure menu items stay clickable */
+document.querySelectorAll(".menu-item").forEach(item => {
+  item.addEventListener("click", e => {
+    e.stopPropagation();
+  });
+});
+
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
 
