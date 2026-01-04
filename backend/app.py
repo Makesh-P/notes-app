@@ -226,7 +226,7 @@ def check_reminders():
             db = get_db()
             c = db.cursor()
             # PostgreSQL requires NOW() at UTC or specific timezone depending on your input
-            c.execute("SELECT id, note_id, label FROM reminders WHERE remind_at <= NOW() AND is_sent = FALSE")
+            c.execute("SELECT id, note_id, label FROM reminders WHERE remind_at <= CURRENT_TIMESTAMP AND is_sent = FALSE")
             due_reminders = c.fetchall()
             if due_reminders:
                 c.execute("SELECT sub_data FROM subscriptions")

@@ -10,12 +10,12 @@ self.addEventListener("activate", () => {
 self.addEventListener('push', function(event) {
   if (event.data) {
     const data = event.data.json();
-    
     const options = {
       body: data.body,
-      icon: '/icon.png', // Add an icon.png to your folder if you want
+      // Removed icon requirement for testing; add a real URL later
+      badge: 'https://cdn-icons-png.flaticon.com/512/1827/1827347.png', 
       data: {
-        url: data.url
+        url: data.url.startsWith('http') ? data.url : self.location.origin + data.url
       }
     };
 

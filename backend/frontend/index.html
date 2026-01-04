@@ -136,7 +136,37 @@ const REMINDER_LOCK_KEY = "reminderLock";
 let allReminders = JSON.parse(localStorage.getItem('allNoteReminders') || '[]');
 
 // ✅ FIXED loadHome()
-function loadHome() {
+async function loadHome() {
+  try {
+    const res = await fetch(`${API}/home`);
+    const items = await res.json();
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+
+    for (const item of items) {
+      const card = document.createElement("a");
+      card.className = `card ${item.type}`;
+      card.href = item.type === 'todo' ? `to-do.html?id=${item.id}` : `${item.type}.html?id=${item.id}`;
+      
+      // Fetch active reminders from server for this specific note
+      const remRes = await fetch(`${API}/reminders/${item.id}`);
+      const reminders = await remRes.json();
+      const activeCount = reminders.length;
+      
+      const badgeHtml = activeCount > 0 ? `<div class="badge">${activeCount}</div>` : '';
+      
+      card.innerHTML = `
+        <button class="delete-btn" onclick="deleteItem(${item.id}, '${item.type}', event)">×</button>
+        ${badgeHtml}
+        <div class="card-title">${item.title}</div>
+        <div class="card-preview">${item.preview}</div>
+      `;
+      grid.appendChild(card);
+    }
+  } catch (err) {
+    console.error("Load error:", err);
+  }
+}{
   fetch(`${API}/home`)
     .then(res => res.json())
     .then(items => {
