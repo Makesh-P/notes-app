@@ -168,7 +168,101 @@ def save_note():
     db.close()
     return jsonify({"ok": True, "id": nid})
 
-# (Include your TODO and BUDGET routes here unchanged...)
+@app.route("/todo/int:id")
+def get_todo(id):
+db = get_db()
+c = db.cursor()
+c.execute("SELECT title, tasks FROM todos WHERE id=%s", (id,))
+row = c.fetchone()
+db.close()
+return jsonify({"title": row[0], "tasks": row[1]}) if row else ({}, 404)
+
+@app.route("/todo", methods=["POST"])
+def save_todo():
+d = request.get_json(force=True)
+now = datetime.now().isoformat()
+preview = (d.get("tasks") or "").replace("<li>", "").replace("</li>", "")[:60] or "No tasks"
+db = get_db()
+c = db.cursor()
+
+if d.get("id"):
+    c.execute("""
+        UPDATE todos SET title=%s, tasks=%s, updated_at=%s WHERE id=%s
+    """, (d["title"], d["tasks"], now, d["id"]))
+
+    c.execute("""
+        UPDATE items SET title=%s, preview=%s, updated_at=%s WHERE type='todo' AND ref_id=%s
+    """, (d["title"], preview, now, d["id"]))
+
+    db.commit()
+    db.close()
+    return jsonify({"ok": True, "id": d["id"]})
+
+c.execute("""
+    INSERT INTO todos (title, tasks, updated_at)
+    VALUES (%s,%s,%s) RETURNING id
+""", (d["title"], d["tasks"], now))
+
+tid = c.fetchone()[0]
+
+c.execute("""
+    INSERT INTO items (type, ref_id, title, preview, color, updated_at)
+    VALUES ('todo',%s,%s,%s,'#e8f1ff',%s)
+""", (tid, d["title"], preview, now))
+
+db.commit()
+db.close()
+return jsonify({"ok": True, "id": tid})
+@app.route("/budget/int:id")
+def get_budget(id):
+db = get_db()
+c = db.cursor()
+c.execute("SELECT title, data FROM budgets WHERE id=%s", (id,))
+row = c.fetchone()
+db.close()
+return jsonify({"title": row[0], "data": row[1]}) if row else ({}, 404)
+
+@app.route("/budget", methods=["POST"])
+def save_budget():
+d = request.get_json(force=True)
+now = datetime.now().isoformat()
+try:
+    items = json.loads(d["data"]) if d["data"] else []
+    preview = " | ".join(i["item"][:15] for i in items[:2]) or "Budget"
+except:
+    preview = "Budget"
+
+db = get_db()
+c = db.cursor()
+
+if d.get("id"):
+    c.execute("""
+        UPDATE budgets SET title=%s, data=%s, updated_at=%s WHERE id=%s
+    """, (d["title"], d["data"], now, d["id"]))
+
+    c.execute("""
+        UPDATE items SET title=%s, preview=%s, updated_at=%s WHERE type='budget' AND ref_id=%s
+    """, (d["title"], preview, now, d["id"]))
+
+    db.commit()
+    db.close()
+    return jsonify({"ok": True})
+
+c.execute("""
+    INSERT INTO budgets (title, data, updated_at)
+    VALUES (%s,%s,%s) RETURNING id
+""", (d["title"], d["data"], now))
+
+bid = c.fetchone()[0]
+
+c.execute("""
+    INSERT INTO items (type, ref_id, title, preview, color, updated_at)
+    VALUES ('budget',%s,%s,%s,'#fff4e6',%s)
+""", (bid, d["title"], preview, now))
+
+db.commit()
+db.close()
+return jsonify({"ok": True, "id": bid})
 
 # ---------------- BACKGROUND SCHEDULER (THE ENGINE) ----------------
 def check_reminders():
