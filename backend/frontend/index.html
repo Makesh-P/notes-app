@@ -130,12 +130,8 @@ body { background: #f5f5f5; height: 100vh; overflow: hidden; }
 
 <script>
 const API = "https://notes-app-5-sgzz.onrender.com";
-const REMINDER_LOCK_KEY = "reminderLock";
 
-// ✅ SHARED REMINDER STORAGE - Works across all tabs
-let allReminders = JSON.parse(localStorage.getItem('allNoteReminders') || '[]');
-
-// ✅ FIXED loadHome()
+/* ================= LOAD HOME ================= */
 async function loadHome() {
   try {
     const res = await fetch(`${API}/home`);
@@ -144,105 +140,63 @@ async function loadHome() {
     grid.innerHTML = "";
 
     for (const item of items) {
-      const card = document.createElement("a");
-      card.className = `card ${item.type}`;
-      card.href = item.type === 'todo' ? `to-do.html?id=${item.id}` : `${item.type}.html?id=${item.id}`;
-      
-      // Fetch active reminders from server for this specific note
       const remRes = await fetch(`${API}/reminders/${item.id}`);
       const reminders = await remRes.json();
-      const activeCount = reminders.length;
-      
-      const badgeHtml = activeCount > 0 ? `<div class="badge">${activeCount}</div>` : '';
-      
+      const badgeHtml = reminders.length
+        ? `<div class="badge">${reminders.length}</div>`
+        : "";
+
+      const card = document.createElement("a");
+      card.className = `card ${item.type}`;
+      card.href =
+        item.type === "todo"
+          ? `to-do.html?id=${item.id}`
+          : `${item.type}.html?id=${item.id}`;
+
       card.innerHTML = `
         <button class="delete-btn" onclick="deleteItem(${item.id}, '${item.type}', event)">×</button>
         ${badgeHtml}
         <div class="card-title">${item.title}</div>
         <div class="card-preview">${item.preview}</div>
       `;
+
       grid.appendChild(card);
     }
-  } catch (err) {
-    console.error("Load error:", err);
+  } catch (e) {
+    console.error("Home load failed:", e);
   }
-}{
-  fetch(`${API}/home`)
-    .then(res => res.json())
-    .then(items => {
-      const grid = document.getElementById("grid");
-      grid.innerHTML = "";
-      items.forEach(item => {
-        const card = document.createElement("a");
-        card.className = `card ${item.type}`;
-        card.href = item.type === 'todo' ? `to-do.html?id=${item.id}` : `${item.type}.html?id=${item.id}`;
-        
-        const activeCount = allReminders.filter(r => r.noteId == item.id && !r.triggered).length;
-        const badgeHtml = activeCount > 0 ? `<div class="badge">${activeCount}</div>` : '';
-        
-        card.innerHTML = `
-          <button class="delete-btn" onclick="deleteItem(${item.id}, '${item.type}', event)">×</button>
-          ${badgeHtml}
-          <div class="card-title">${item.title}</div>
-          <div class="card-preview">${item.preview}</div>
-        `;
-        grid.appendChild(card);
-      });
-    })
-    .catch(err => console.error("Load error:", err));
 }
 
+/* ================= DELETE ================= */
 function deleteItem(id, type, event) {
   event.preventDefault();
   event.stopPropagation();
-  if (confirm(`Delete "${type}" item?`)) {
-    fetch(`${API}/${type}/${id}`, { method: "DELETE" })
-      .then(() => {
-        allReminders = allReminders.filter(r => r.noteId != id);
-        localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
-        loadHome();
-      });
-  }
+  if (!confirm(`Delete "${type}" item?`)) return;
+
+  fetch(`${API}/${type}/${id}`, { method: "DELETE" })
+    .then(() => loadHome());
 }
 
-// ✅ GLOBAL FUNCTIONS (Self-contained)
-window.addNoteReminder = function(noteId, label, time) {
-  const reminder = {
-    id: Date.now(),
-    noteId: parseInt(noteId),
-    label,
-    time,
-    triggered: false
-  };
-  allReminders.push(reminder);
-  localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
-  loadHome();
-  return reminder.id;
-};
-
-window.deleteNoteReminder = function(reminderId) {
-  allReminders = allReminders.filter(r => r.id != reminderId);
-  localStorage.setItem('allNoteReminders', JSON.stringify(allReminders));
-  loadHome();
-};
-
-window.getNoteReminders = function(noteId) {
-  return allReminders.filter(r => r.noteId == noteId);
-};
-
-// Notification permission
-if ("Notification" in window && Notification.permission === "default") {
-  Notification.requestPermission();
-}
-
-// Start reminder engine
+/* ================= INIT ================= */
 loadHome();
 
+/* ================= MAGIC MENU ================= */
 const magicMenu = document.getElementById("magicMenu");
 const magicToggle = document.getElementById("magicToggle");
-magicToggle.onclick = e => { e.stopPropagation(); magicMenu.classList.toggle("active"); };
-document.onclick = e => { if (!magicMenu.contains(e.target)) magicMenu.classList.remove("active"); };
+
+magicToggle.onclick = e => {
+  e.stopPropagation();
+  magicMenu.classList.toggle("active");
+};
+
+document.onclick = e => {
+  if (!magicMenu.contains(e.target)) {
+    magicMenu.classList.remove("active");
+  }
+};
+
 window.onpageshow = () => magicMenu.classList.remove("active");
 </script>
+
 </body>
 </html>

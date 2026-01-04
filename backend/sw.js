@@ -1,45 +1,33 @@
-self.addEventListener("install", () => {
-  self.skipWaiting();
-});
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", () => self.clients.claim());
 
-self.addEventListener("activate", () => {
-  self.clients.claim();
-});
+self.addEventListener("push", event => {
+  if (!event.data) return;
 
-// 1. Listen for Push Messages from Server
-self.addEventListener('push', function(event) {
-  if (event.data) {
-    const data = event.data.json();
-    const options = {
+  const data = event.data.json();
+  const url = new URL(data.url, self.location.origin).href;
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
       body: data.body,
-      // Removed icon requirement for testing; add a real URL later
-      badge: 'https://cdn-icons-png.flaticon.com/512/1827/1827347.png', 
-      data: {
-        url: data.url.startsWith('http') ? data.url : self.location.origin + data.url
-      }
-    };
-
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
-  }
+      badge: "https://cdn-icons-png.flaticon.com/512/1827/1827347.png",
+      data: { url }
+    })
+  );
 });
 
-// 2. Handle Click (Open the Note)
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const url = event.notification.data.url;
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true })
-      .then(clientList => {
-        // If tab is open, focus it
-        for (const client of clientList) {
-          if (client.url.includes(url)) {
+      .then(clientsArr => {
+        for (const client of clientsArr) {
+          if (client.url === url && "focus" in client) {
             return client.focus();
           }
         }
-        // If not, open new window
         return clients.openWindow(url);
       })
   );

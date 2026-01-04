@@ -294,78 +294,50 @@ textarea{
 
 <script>
 /* ================= CONFIG ================= */
-const API = "https://notes-app-5-sgzz.onrender.com"; // Your API URL
-const params = new URLSearchParams(window.location.search);
+const API = "https://notes-app-5-sgzz.onrender.com";
+const params = new URLSearchParams(location.search);
 let noteId = params.get("id");
 let isSaving = false;
 
-// PASTE YOUR GENERATED PUBLIC KEY HERE
-const PUBLIC_VAPID_KEY = "BCjE7S3Qg5wOKbwx1Sirc5ElWzhKFjNMfEWUQskfdwNoyQg026mlf6e6-1TvAod_cwaN1oh-Unr6klWxruhi-IY"; 
+const PUBLIC_VAPID_KEY =
+  "BCjE7S3Qg5wOKbwx1Sirc5ElWzhKFjNMfEWUQskfdwNoyQg026mlf6e6-1TvAod_cwaN1oh-Unr6klWxruhi-IY";
 
-/* ================= SERVICE WORKER & PUSH ================= */
-// 1. Convert Key Helper
+/* ================= HELPERS ================= */
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
-// 2. Register & Subscribe
-async function setupPushNotifications() {
-  if (!('serviceWorker' in navigator)) return;
-  const register = await navigator.serviceWorker.register('/sw.js');
-  await navigator.serviceWorker.ready;
-  
-  let subscription = await register.pushManager.getSubscription();
-  if (!subscription) {
-    subscription = await register.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(PUBLICVAPIDKEY)
-    });
-    await fetch(`${API}/subscribe`, {
-      method: 'POST',
-      body: JSON.stringify(subscription),
-      headers: { 'content-type': 'application/json' }
-    });
-  }
-}
+/* ================= PUSH SETUP ================= */
+async function setupPush() {
+  if (!("serviceWorker" in navigator)) return;
 
-  if (!('serviceWorker' in navigator)) return;
-
-  const register = await navigator.serviceWorker.register('sw.js');
+  const reg = await navigator.serviceWorker.register("/sw.js");
   await navigator.serviceWorker.ready;
 
-  // Check if already subscribed
-  let subscription = await register.pushManager.getSubscription();
-
-  // If not, subscribe
-  if (!subscription) {
-    subscription = await register.pushManager.subscribe({
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
     });
+    await fetch(`${API}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub)
+    });
   }
-
-  // Send subscription to Backend
-  await fetch(`${API}/subscribe`, {
-    method: 'POST',
-    body: JSON.stringify(subscription),
-    headers: { 'content-type': 'application/json' }
-  });
-
-
-// Trigger setup on load
-setupPushNotifications().catch(err => console.error("Push setup failed", err));
+}
+setupPush();
 
 /* ================= ELEMENTS ================= */
-const titleInput = document.getElementById("noteTitle");
-const keywordsInput = document.getElementById("keywords");
-const notesInput = document.getElementById("notes");
+const titleInput = noteTitle;
+const keywordsInput = keywords;
+const notesInput = notes;
 const reminderLabel = document.getElementById("reminderLabel");
 const reminderTime = document.getElementById("reminderTime");
 const reminderList = document.getElementById("reminderList");
@@ -373,7 +345,7 @@ const menu = document.getElementById("menu");
 const menuBtn = document.getElementById("menuBtn");
 const overlays = document.querySelectorAll(".overlay");
 
-/* ================= LOAD DATA ================= */
+/* ================= LOAD NOTE ================= */
 if (noteId) {
   fetch(`${API}/note/${noteId}`)
     .then(r => r.json())
@@ -381,73 +353,13 @@ if (noteId) {
       titleInput.value = d.title || "";
       keywordsInput.value = d.keywords || "";
       notesInput.value = d.content || "";
-      loadReminders(); // Load from DB
+      loadReminders();
     });
-} else {
-  // New note, no reminders yet
-}
-
-/* ================= REMINDER LOGIC (SERVER-SIDE) ================= */
-
-function loadReminders() {
-  if (!noteId) return;
-  fetch(`${API}/reminders/${noteId}`)
-    .then(r => r.json())
-    .then(data => renderReminders(data));
-}
-
-function renderReminders(reminders) {
-  if (!reminders.length) {
-    reminderList.innerHTML = `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>`;
-    return;
-  }
-  reminderList.innerHTML = reminders.map(r => `
-    <div class="reminder-item">
-      <div>
-        <strong>${r.label}</strong><br>
-        <small>${new Date(r.time).toLocaleString()}</small>
-      </div>
-      <button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>
-    </div>
-  `).join("");
-}
-
-function saveReminder() {
-  const label = reminderLabel.value.trim();
-  const time = reminderTime.value;
-
-  if (!label || !time) return alert("Label & time required");
-  if (!noteId) return alert("Save note first (Ctrl+S)");
-
-  // Send to Backend
-  fetch(`${API}/reminders`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ noteId, label, time })
-  })
-  .then(() => {
-    alert("Reminder Set! It will notify you even if closed.");
-    reminderLabel.value = "";
-    reminderTime.value = "";
-    loadReminders(); // Refresh list
-    closePopups();
-  });
-}
-
-function deleteReminder(id) {
-  fetch(`${API}/reminders/${id}`, { method: "DELETE" })
-    .then(() => loadReminders());
 }
 
 /* ================= SAVE NOTE ================= */
-// (Keep your existing saveNote logic here exactly as it was)
 function saveNote(silent = false) {
   if (isSaving) return;
-  const title = titleInput.value.trim();
-  const keywords = keywordsInput.value.trim();
-  const content = notesInput.value.trim();
-  if (!title && !content && !keywords) return;
-
   isSaving = true;
 
   fetch(`${API}/note`, {
@@ -455,27 +367,95 @@ function saveNote(silent = false) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: noteId ? Number(noteId) : null,
-      title,
-      keywords,
-      content
+      title: titleInput.value,
+      keywords: keywordsInput.value,
+      content: notesInput.value
     })
   })
-  .then(r => r.json())
-  .then(d => {
-    if (d.id) {
-      noteId = d.id;
-      history.replaceState(null, "", `note.html?id=${noteId}`);
-    }
-    if (!silent) alert("Note Saved ✔");
-    loadReminders(); // Refresh reminders in case note ID changed
-  })
-  .finally(() => isSaving = false);
+    .then(r => r.json())
+    .then(d => {
+      if (d.id && !noteId) {
+        noteId = d.id;
+        history.replaceState(null, "", `note.html?id=${noteId}`);
+      }
+      if (!silent) alert("Note Saved ✔");
+      loadReminders();
+    })
+    .finally(() => (isSaving = false));
 }
 
-/* ================= UI LOGIC ================= */
-// (Keep your existing Menu/Popup logic exactly as it was)
-menuBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
-window.onclick = e => { if (!menu.contains(e.target)) menu.classList.remove("active"); };
+setInterval(() => saveNote(true), 30000);
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "s") {
+    e.preventDefault();
+    saveNote(false);
+  }
+});
+
+/* ================= REMINDERS ================= */
+function loadReminders() {
+  if (!noteId) return;
+  fetch(`${API}/reminders/${noteId}`)
+    .then(r => r.json())
+    .then(renderReminders);
+}
+
+function renderReminders(list) {
+  if (!list.length) {
+    reminderList.innerHTML =
+      `<div style="text-align:center;color:#888;font-size:12px;padding:10px;">No reminders set</div>`;
+    return;
+  }
+
+  reminderList.innerHTML = list
+    .map(
+      r => `
+      <div class="reminder-item">
+        <div>
+          <strong>${r.label}</strong><br>
+          <small>${new Date(r.time).toLocaleString()}</small>
+        </div>
+        <button class="delete-reminder" onclick="deleteReminder(${r.id})">Delete</button>
+      </div>`
+    )
+    .join("");
+}
+
+function saveReminder() {
+  if (!noteId) return alert("Save note first");
+  if (!reminderLabel.value || !reminderTime.value)
+    return alert("Label & time required");
+
+  fetch(`${API}/reminders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      noteId,
+      label: reminderLabel.value,
+      time: reminderTime.value
+    })
+  }).then(() => {
+    reminderLabel.value = "";
+    reminderTime.value = "";
+    loadReminders();
+    closePopups();
+  });
+}
+
+function deleteReminder(id) {
+  fetch(`${API}/reminders/${id}`, { method: "DELETE" })
+    .then(loadReminders);
+}
+
+/* ================= UI ================= */
+menuBtn.onclick = e => {
+  e.stopPropagation();
+  menu.classList.toggle("active");
+};
+
+window.onclick = e => {
+  if (!menu.contains(e.target)) menu.classList.remove("active");
+};
 
 function openPopup(id) {
   menu.classList.remove("active");
@@ -485,68 +465,15 @@ function openPopup(id) {
 }
 
 function closePopups() {
-  overlays.forEach(o => o.style.display = "none");
+  overlays.forEach(o => (o.style.display = "none"));
 }
-overlays.forEach(o => o.onclick = e => { if (e.target === o) closePopups(); });
 
-/* ================= SHORTCUT ================= */
-setInterval(() => saveNote(true), 30000);
-document.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key === "s") {
-    e.preventDefault();
-    saveNote(false);
-  }
-});
-
-/* ================= MENU HANDLERS ================= */
-["font","size","color","reminder","share"].forEach(type => {
-  const item = document.querySelector(`.menu-item.${type}`);
-  if (!item) return;
-  item.onclick = e => {
-    e.stopPropagation();
-    openPopup(
-      type === "font" ? "fontPopup" :
-      type === "size" ? "sizePopup" :
-      type === "color" ? "colorPopup" :
-      type === "reminder" ? "reminderPopup" :
-      "qrPopup"
-    );
+overlays.forEach(o => {
+  o.onclick = e => {
+    if (e.target === o) closePopups();
   };
 });
-// Helper to convert VAPID key to Uint8Array
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-const VAPID_PUBLIC_KEY = "BCjE7S3Qg5wOKbwx1Sirc5ElWzhKFjNMfEWUQskfdwNoyQg026mlf6e6-1TvAod_cwaN1oh-Unr6klWxruhi-IY";
-
-async function subscribeUser() {
-  if ('serviceWorker' in navigator) {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-
-    await fetch('/subscribe', {
-      method: 'POST',
-      body: JSON.stringify(subscription),
-      headers: { 'Content-Type': 'application/json' }
-    });
-    console.log("Subscribed successfully");
-  }
-}
-// Call this when the note page loads
-subscribeUser();
 </script>
-
 
 </body>
 </html>

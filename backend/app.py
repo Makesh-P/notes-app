@@ -225,6 +225,53 @@ def check_reminders():
         try:
             db = get_db()
             c = db.cursor()
+
+            c.execute("""
+                SELECT id, note_id, label
+                FROM reminders
+                WHERE remind_at <= CURRENT_TIMESTAMP
+                AND is_sent = FALSE
+            """)
+            reminders = c.fetchall()
+
+            if reminders:
+                c.execute("SELECT sub_data FROM subscriptions")
+                subs = c.fetchall()
+
+                for rid, note_id, label in reminders:
+                    payload = json.dumps({
+                        "title": "📝 Note Reminder",
+                        "body": label,
+                        "url": f"/note.html?id={note_id}"
+                    })
+
+                    for sub in subs:
+                        try:
+                            webpush(
+                                subscription_info=json.loads(sub[0]),
+                                data=payload,
+                                vapid_private_key=VAPID_PRIVATE_KEY,
+                                vapid_claims=VAPID_CLAIMS
+                            )
+                        except Exception as e:
+                            print("Push error:", e)
+
+                    c.execute(
+                        "UPDATE reminders SET is_sent = TRUE WHERE id = %s",
+                        (rid,)
+                    )
+
+                db.commit()
+            db.close()
+        except Exception as e:
+            print("Reminder loop error:", e)
+
+        time.sleep(20)
+
+    while True:
+        try:
+            db = get_db()
+            c = db.cursor()
             c.execute("""
                 SELECT id, note_id, label 
                 FROM reminders 
