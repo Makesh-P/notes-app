@@ -251,14 +251,14 @@ textarea{
   </div>
 
   <!-- MENU -->
-  <div class="note-menu" id="menu">
-    <div class="menu-item font" title="Font">A</div>
-    <div class="menu-item size" title="Size">Aa</div>
-    <div class="menu-item color" title="Color">🎨</div>
-    <div class="menu-item reminder" title="Reminder">⏰</div>
-    <div class="menu-item share" title="Share">🔗</div>
-    <div class="menu-main" id="menuBtn">✏️</div>
-  </div>
+ <div class="note-menu" id="menu">
+  <div class="menu-item share" title="Share" onclick="openPopup('qrPopup')">🔗</div>
+  <div class="menu-item reminder" title="Reminder" onclick="openPopup('reminderPopup')">⏰</div>
+  <div class="menu-item color" title="Color" onclick="openPopup('colorPopup')">🎨</div>
+  <div class="menu-item size" title="Size" onclick="openPopup('sizePopup')">Aa</div>
+  <div class="menu-item font" title="Font" onclick="openPopup('fontPopup')">A</div>
+  <div class="menu-main" id="menuBtn">✏️</div>
+</div>
 </div>
 
 <!-- POPUPS -->
@@ -466,31 +466,34 @@ function deleteReminder(id) {
 }
 
 /* ================= UI ================= */
-menuBtn.onclick = e => {
+// 1. Logic to open/close the Magic Menu
+menuBtn.onclick = (e) => {
   e.stopPropagation();
   menu.classList.toggle("active");
 };
 
-window.onclick = e => {
-  if (!menu.contains(e.target)) menu.classList.remove("active");
+// 2. Logic to close the menu if you click anywhere else on the screen
+window.onclick = (e) => {
+  if (!menu.contains(e.target)) {
+    menu.classList.remove("active");
+  }
 };
 
+// 3. Logic to open the specific popups (Font, Color, etc.)
 function openPopup(id) {
-  menu.classList.remove("active");
-  closePopups();
-  document.getElementById(id).style.display = "flex";
-  if (id === "reminderPopup") loadReminders();
+  menu.classList.remove("active"); // Hide menu when a tool is picked
+  closePopups(); // Close any other open popups
+  const targetPopup = document.getElementById(id);
+  if (targetPopup) {
+    targetPopup.style.display = "flex";
+    if (id === "reminderPopup") loadReminders();
+  }
 }
 
 function closePopups() {
+  const overlays = document.querySelectorAll('.overlay');
   overlays.forEach(o => (o.style.display = "none"));
 }
-
-overlays.forEach(o => {
-  o.onclick = e => {
-    if (e.target === o) closePopups();
-  };
-});
 </script>
 
 </body>
